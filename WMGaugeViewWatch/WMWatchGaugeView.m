@@ -5,16 +5,12 @@
  *
  */
 
-#import "WMGaugeView.h"
-
-@interface WMGaugeView () <CAAnimationDelegate>
-
-@end
+#import "WMWatchGaugeView.h"
 
 /* Scale conversion macro from [0-1] range to view  real size range */
 #define FULL_SCALE(x,y)    (x)*self.bounds.size.width, (y)*self.bounds.size.height
 
-@implementation WMGaugeView
+@implementation WMWatchGaugeView
 {
     /* Drawing rects */
     CGRect fullRect;
@@ -35,23 +31,24 @@
     
     /* Background image */
     UIImage *background;
-    
-    /* Needle layer */
-    CALayer *rootNeedleLayer;
-    CALayer *secondRootNeedleLayer;
-    CALayer *thirdRootNeedleLayer;
   
-
     /* Annimation completion */
     void (^animationCompletion)(BOOL);
 }
 
 #pragma mark - Initialization
 
-- (instancetype)initWithFrame:(CGRect)frame andConfig:(GraphicGaugeConfig *)config;
+- (UIImage *)getImage
 {
-  self = [super initWithFrame:frame];
+  return background;
+}
+
+- (id)initWithConfig:(GraphicGaugeConfig *)config
+{
+  self = [super init];
   self.config = config;
+  //self = [super initWithFrame:frame];
+  //self.bounds = frame;
   if (self)
   {
 	[self initialize];
@@ -61,8 +58,7 @@
 
 - (void)awakeFromNib
 {
-  [super awakeFromNib];
-  [self initialize];
+    [self initialize];
 }
 
 /**
@@ -71,16 +67,16 @@
  */
 - (void)initialize;
 {
-    self.style = nil;
+  _style = nil;
   
-    _value = 0.0;
-
-    background = nil;
+  _value = 0.0;
   
-    animationCompletion = nil;
-
-    [self initDrawingRects];
-    [self initScale];
+  background = nil;
+  
+  animationCompletion = nil;
+  
+  [self initDrawingRects];
+  [self initScale];
 }
 
 /**
@@ -118,33 +114,44 @@
 /**
  * Main drawing entry point 
  */
-- (void)drawRect:(CGRect)rect
+- (void)drawRect:(CGRect)rect background:(UIColor *)backgrounColor
 {
-    if (background == nil)
-    {
-        // Create image context
-        UIGraphicsBeginImageContextWithOptions(rect.size, NO, [UIScreen mainScreen].scale);
-        CGContextRef context = UIGraphicsGetCurrentContext();
-        
-        // Scale context for [0-1] drawings
-        CGContextScaleCTM(context, rect.size.width , rect.size.height);
+  // Create image context
+  UIGraphicsBeginImageContextWithOptions(rect.size, NO, 1.0);//[UIScreen mainScreen].scale);
+  CGContextRef context = UIGraphicsGetCurrentContext();
+  
+  //[backgrounColor setFill];
+  //CGContextFillRect(context, CGRectMake(0, 0, rect.size.width, rect.size.height));
 
-        // Draw gauge background in image context
-        [self drawGauge:context];
-        
-        // Save background
-        background = UIGraphicsGetImageFromCurrentImageContext();
-        UIGraphicsEndImageContext();
-    }
-    
+  
+  [self drawNeedle:rect context:context];
+  
+  if ( self.config.numberOfNeedles > 1 )
+	[self drawSecondNeedle:rect context:context];
+  
+  if ( self.config.numberOfNeedles > 2 )
+	[self drawThirdNeedle:rect context:context];
+  
+  // Scale context for [0-1] drawings
+  CGContextScaleCTM(context, rect.size.width , rect.size.height);
+  
+  // Draw gauge background in image context
+  [self drawGauge:context];
+	
+  
+  // Save background
+  background = UIGraphicsGetImageFromCurrentImageContext();
+  UIGraphicsEndImageContext();
+  
+
     // Drawing background in view
-    [background drawInRect:rect];
-    
+  //[background drawInRect:rect];
+ 
+  /*
     if (rootNeedleLayer == nil)
     {
         // Initialize needle layer
         rootNeedleLayer = [CALayer new];
-	  //rootNeedleLayer.backgroundColor = [UIColor grayColor].CGColor;
 
         // For performance puporse, the needle layer is not scaled to [0-1] range
         rootNeedleLayer.frame = self.bounds;
@@ -157,7 +164,7 @@
         [self setValue:_value animated:NO];
     }    
 
-    if (self.config.numberOfNeedles > 1 && secondRootNeedleLayer == nil)
+    if (_hasTwoNeedles && secondRootNeedleLayer == nil)
     {
         // Initialize needle layer
         secondRootNeedleLayer = [CALayer new];
@@ -171,24 +178,8 @@
         
         // Set needle current value
         [self setSecondValue:_secondValue animated:NO];
-    }
-  
-  if (self.config.numberOfNeedles > 2 && thirdRootNeedleLayer == nil)
-  {
-	// Initialize needle layer
-	thirdRootNeedleLayer = [CALayer new];
-	
-	// For performance puporse, the needle layer is not scaled to [0-1] range
-	thirdRootNeedleLayer.frame = self.bounds;
-	[self.layer addSublayer:thirdRootNeedleLayer];
-	
-	// Draw needle
-	[self drawThirdNeedle];
-	
-	// Set needle current value
-	[self setThirdValue:_thirdValue animated:NO];
-  }
-
+    } 
+   */
 }
 
 /**
@@ -227,7 +218,7 @@
  */
 - (void)drawFace:(CGContextRef)context
 {
-    if ([_style conformsToProtocol:@protocol(WMGaugeViewStyle)]) {
+    if ([_style conformsToProtocol:@protocol(WMWatchGaugeViewStyle)]) {
         [_style drawFaceWithContext:context inRect:faceRect];
     }
 }
@@ -258,7 +249,7 @@
   NSString *str;
   
   CGFloat value = _labelValue != nil ? _labelValue.floatValue : _value;
-  
+
   if ( self.config.valueLabelFormat )
 	str = [NSString stringWithFormat:self.config.valueLabelFormat, value];
   else
@@ -272,7 +263,7 @@
 
 
 /**
- * Scale drawing 
+ * Scale drawing
  */
 - (void)drawScale:(CGContextRef)context
 {
@@ -368,7 +359,7 @@
         // Range curved shape
         UIBezierPath *path = [UIBezierPath bezierPath];
         [path addArcWithCenter:center radius:rangeLabelsRect.size.width / 2.0 startAngle:DEGREES_TO_RADIANS(lastStartAngle) endAngle:DEGREES_TO_RADIANS(valueAngle) - 0.01 clockwise:YES];
-        
+	  
         UIColor *color = self.config.rangeColors[i];
         [color setStroke];
         path.lineWidth = self.config.rangeLabelsWidth;
@@ -386,32 +377,29 @@
 /**
  * Needle drawing 
  */
-- (void)drawNeedle
+- (void)drawNeedle:(CGRect)rect context:(CGContextRef)context
 {
-    if ([_style conformsToProtocol:@protocol(WMGaugeViewStyle)]) {
-	  [_style drawNeedleOnLayer:rootNeedleLayer 
-			     inRect:self.bounds 
-			      color:self.config.needleColor];
+    if ([_style conformsToProtocol:@protocol(WMWatchGaugeViewStyle)]) {
+	  [_style drawNeedleInRect:rect
+						 color:self.config.needleColor
+					   atAngle:[self needleAngleForValue:_value]
+					   inContext:context];
 
     }
 }
 
-- (void)drawSecondNeedle
+- (void)drawSecondNeedle:(CGRect)rect context:(CGContextRef)context
 {
-    if ([_style conformsToProtocol:@protocol(WMGaugeViewStyle)]) {
-	  [_style drawNeedleOnLayer:secondRootNeedleLayer
-				   inRect:self.bounds
-				    color:self.config.secondNeedleColor];
+    if ([_style conformsToProtocol:@protocol(WMWatchGaugeViewStyle)]) {
+	  [_style drawNeedleInRect:rect color:self.config.secondNeedleColor atAngle:[self needleAngleForValue:_secondValue] inContext:context];
 
     }
 }
 
-- (void)drawThirdNeedle
+- (void)drawThirdNeedle:(CGRect)rect context:(CGContextRef)context
 {
-  if ([_style conformsToProtocol:@protocol(WMGaugeViewStyle)]) {
-	[_style drawNeedleOnLayer:thirdRootNeedleLayer
-					   inRect:self.bounds
-						color:self.config.thirdNeedleColor];
+  if ([_style conformsToProtocol:@protocol(WMWatchGaugeViewStyle)]) {
+	[_style drawNeedleInRect:rect color:self.config.thirdNeedleColor atAngle:[self needleAngleForValue:_thirdValue] inContext:context];
 	
   }
 }
@@ -434,7 +422,8 @@
  */
 - (CGFloat)needleAngleForValue:(double)value
 {
-    return DEGREES_TO_RADIANS(self.config.scaleStartAngle + (value - self.config.minValue) / (self.config.maxValue - self.config.minValue) * (self.config.scaleEndAngle - self.config.scaleStartAngle)) + M_PI;
+  double angle = self.config.scaleStartAngle + (value - self.config.minValue) / (self.config.maxValue - self.config.minValue) * (self.config.scaleEndAngle - self.config.scaleStartAngle);
+  return DEGREES_TO_RADIANS(angle) + M_PI;
 }
 
 /**
@@ -524,81 +513,18 @@
     CGContextRestoreGState(context);
 }
 
-- (void)moveNeedleToNewFrame:(CGRect)frame oldFrame:(CGRect)oldFrame
-{
-
-  /*
-  if (oldFrame.size.width < frame.size.width )
-	rootNeedleLayer.transform = CATransform3DConcat(CATransform3DMakeScale(frame.size.width/oldFrame.size.width, frame.size.height/oldFrame.size.height, 1.0), CATransform3DMakeRotation([self needleAngleForValue:_value], 0, 0, 1.0));
-  else
-	rootNeedleLayer.transform = CATransform3DConcat(CATransform3DMakeScale(1, 1, 1.0),
-													CATransform3DMakeRotation([self needleAngleForValue:_value], 0, 0, 1.0));
-   */
-  
-  //rootNeedleLayer.position = CGPointMake(frame.size.width/2, frame.size.height/2);
-  
-  CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
-  
-  // Set the initial and the final values
-  if (oldFrame.size.width < frame.size.width )
-  {
-	[animation setFromValue:[NSNumber numberWithFloat:1.0]];
-	[animation setToValue:[NSNumber numberWithFloat:frame.size.width/oldFrame.size.width]];
-  }
-  else
-  {
-	[animation setFromValue:[NSNumber numberWithFloat:oldFrame.size.width/frame.size.width]];
-	[animation setToValue:[NSNumber numberWithFloat:1.0]];
-  }
-  
-  // Set duration
-  [animation setDuration:0.5];
-  
-  // Set animation to be consistent on completion
-  [animation setRemovedOnCompletion:NO];
-  [animation setFillMode:kCAFillModeForwards];
-  
-  // Add animation to the view's layer
-  [rootNeedleLayer addAnimation:animation forKey:nil];
-  
-  animation = [CABasicAnimation animationWithKeyPath:@"position"];
-  animation.duration = 0.5;
-  if (oldFrame.size.width < frame.size.width )
-  {
-	animation.fromValue = [NSValue valueWithCGPoint:rootNeedleLayer.position];
-	animation.toValue = [NSValue valueWithCGPoint:CGPointMake(frame.size.width/2, frame.size.height/2)];
-  }
-  else
-  {
-	animation.toValue = [NSValue valueWithCGPoint:rootNeedleLayer.position];
-	animation.fromValue = [NSValue valueWithCGPoint:CGPointMake(oldFrame.size.width/2, oldFrame.size.height/2)];
-  }
-  [animation setRemovedOnCompletion:NO];
-  [animation setFillMode:kCAFillModeForwards];
-  [rootNeedleLayer addAnimation:animation forKey:nil];
-}
-
-/*
-- (void)layoutSubviews
-{
-  // resize your layers based on the view's new bounds
-  rootNeedleLayer.frame = self.bounds;
-}
- */
-
-
 /**
  * Invalidate background
  * Background will be regenerated during next draw rect
  */
+
 - (void)invalidateBackground
 {
     background = nil;
     [self initDrawingRects];
     [self initScale];
-    [self setNeedsDisplay];
+    //[self setNeedsDisplay];
 }
-
 
 /**
  * Invalidate Needle
@@ -606,31 +532,14 @@
  */
 - (void)invalidateNeedle
 {
-
-  [rootNeedleLayer removeFromSuperlayer];
-  [rootNeedleLayer removeAllAnimations];
-  rootNeedleLayer.sublayers = nil;
-  rootNeedleLayer = nil;
-  
-  if ( secondRootNeedleLayer )
-  {
-	[secondRootNeedleLayer removeFromSuperlayer];
-	[secondRootNeedleLayer removeAllAnimations];
-	secondRootNeedleLayer.sublayers = nil;
-	secondRootNeedleLayer = nil;
-  }
-
-  if ( thirdRootNeedleLayer )
-  {
-	[thirdRootNeedleLayer removeFromSuperlayer];
-	[thirdRootNeedleLayer removeAllAnimations];
-	thirdRootNeedleLayer.sublayers = nil;
-	thirdRootNeedleLayer = nil;
-  }
-  
-  [self setNeedsDisplay];
+  /*
+    [rootNeedleLayer removeAllAnimations];
+    rootNeedleLayer.sublayers = nil;
+    rootNeedleLayer = nil;
+    
+    [self setNeedsDisplay];
+   */
 }
-
 #pragma mark - Value update
 
 /**
@@ -678,11 +587,6 @@
   _thirdValue = value;
 }
 
-- (void)setLabelValue:(NSNumber *)value
-{
-  _labelValue = value;
-  [self invalidateBackground];
-}
 
 /**
  * Update gauge value with animation
@@ -716,10 +620,11 @@
     [self setSecondValue:value animated:animated duration:0.8 completion:completion];
 }
 
-- (void)setThirdValue:(float)value animated:(BOOL)animated completion:(void (^)(BOOL))completion
+- (void)setThirdValue:(float)value animated:(BOOL)animated completion:(void (^)(BOOL finished))completion
 {
   [self setThirdValue:value animated:animated duration:0.8 completion:completion];
 }
+
 
 /**
  * Update gauge value with animation and duration
@@ -739,7 +644,6 @@
   [self setThirdValue:value animated:animated duration:duration completion:nil];
 }
 
-
 /**
  * Update gauge value with animation, duration and fire a completion block
  */
@@ -749,7 +653,9 @@
   if ( _value == value && !completion )
     return;
    */
+  [self updateValue:value];
 
+  /*
     animationCompletion = completion;
     
     double lastValue = _value;
@@ -757,9 +663,7 @@
     [self updateValue:value];
     double middleValue = lastValue + (((lastValue + (_value - lastValue) / 2.0) >= 0) ? (_value - lastValue) / 2.0 : (lastValue - _value) / 2.0);
     
-    // Needle animation to target value
-    // An intermediate "middle" value is used to make sure the needle will follow the right rotation direction
-    
+  
     CAKeyframeAnimation * animation = [CAKeyframeAnimation animationWithKeyPath:@"transform"];
     animation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
     animation.removedOnCompletion = YES;
@@ -774,74 +678,24 @@
         rootNeedleLayer.transform = [[animation.values lastObject] CATransform3DValue];
         [rootNeedleLayer addAnimation:animation forKey:kCATransition];
     }
+   */
 }
 
 
 - (void)setSecondValue:(float)value animated:(BOOL)animated duration:(NSTimeInterval)duration completion:(void (^)(BOOL finished))completion
 {
-  /*
-  if ( _secondValue == value && !completion )
-    return;
-   */
-
-    animationCompletion = completion;
-    
-    double lastValue = _secondValue;
-    
-    [self updateSecondValue:value];
-    double middleValue = lastValue + (((lastValue + (_secondValue - lastValue) / 2.0) >= 0) ? (_secondValue - lastValue) / 2.0 : (lastValue - _secondValue) / 2.0);
-    
-    // Needle animation to target value
-    // An intermediate "middle" value is used to make sure the needle will follow the right rotation direction
-    
-    CAKeyframeAnimation * animation = [CAKeyframeAnimation animationWithKeyPath:@"transform"];
-    animation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-    animation.removedOnCompletion = YES;
-    animation.duration = animated ? duration : 0.0;
-    animation.delegate = self;
-    animation.values = @[[NSValue valueWithCATransform3D:CATransform3DMakeRotation([self needleAngleForValue:lastValue]  , 0, 0, 1.0)],
-                         [NSValue valueWithCATransform3D:CATransform3DMakeRotation([self needleAngleForValue:middleValue], 0, 0, 1.0)],
-                         [NSValue valueWithCATransform3D:CATransform3DMakeRotation([self needleAngleForValue:_secondValue]     , 0, 0, 1.0)]];
-    
-    if ([_style conformsToProtocol:@protocol(WMGaugeViewStyle)] == NO || [_style needleLayer:secondRootNeedleLayer willMoveAnimated:animated duration:duration animation:animation] == NO)
-    {
-        secondRootNeedleLayer.transform = [[animation.values lastObject] CATransform3DValue];
-        [secondRootNeedleLayer addAnimation:animation forKey:kCATransition];
-    }
+  [self updateSecondValue:value];
 }
 
 - (void)setThirdValue:(float)value animated:(BOOL)animated duration:(NSTimeInterval)duration completion:(void (^)(BOOL finished))completion
 {
-  
-  animationCompletion = completion;
-  
-  double lastValue = _thirdValue;
-  
   [self updateThirdValue:value];
-  double middleValue = lastValue + (((lastValue + (_thirdValue - lastValue) / 2.0) >= 0) ? (_thirdValue - lastValue) / 2.0 : (lastValue - _thirdValue) / 2.0);
-  
-  // Needle animation to target value
-  // An intermediate "middle" value is used to make sure the needle will follow the right rotation direction
-  
-  CAKeyframeAnimation * animation = [CAKeyframeAnimation animationWithKeyPath:@"transform"];
-  animation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-  animation.removedOnCompletion = YES;
-  animation.duration = animated ? duration : 0.0;
-  animation.delegate = self;
-  animation.values = @[[NSValue valueWithCATransform3D:CATransform3DMakeRotation([self needleAngleForValue:lastValue]  , 0, 0, 1.0)],
-					   [NSValue valueWithCATransform3D:CATransform3DMakeRotation([self needleAngleForValue:middleValue], 0, 0, 1.0)],
-					   [NSValue valueWithCATransform3D:CATransform3DMakeRotation([self needleAngleForValue:_thirdValue]     , 0, 0, 1.0)]];
-  
-  if ([_style conformsToProtocol:@protocol(WMGaugeViewStyle)] == NO || [_style needleLayer:thirdRootNeedleLayer willMoveAnimated:animated duration:duration animation:animation] == NO)
-  {
-	thirdRootNeedleLayer.transform = [[animation.values lastObject] CATransform3DValue];
-	[thirdRootNeedleLayer addAnimation:animation forKey:kCATransition];
-  }
 }
 
 
 #pragma mark - CAAnimation delegate
 
+/*
 - (void)animationDidStop:(CAAnimation *)anim finished:(BOOL)flag
 {
     if (animationCompletion)
@@ -849,6 +703,7 @@
     
     animationCompletion = nil;
 }
+ */
 
 #pragma mark - Properties
 
@@ -1061,7 +916,7 @@
     [self invalidateBackground];
 }
 
-- (void)setStyle:(id<WMGaugeViewStyle>)style {
+- (void)setStyle:(id<WMWatchGaugeViewStyle>)style {
     _style = style;
     [self invalidateBackground];
     [self invalidateNeedle];

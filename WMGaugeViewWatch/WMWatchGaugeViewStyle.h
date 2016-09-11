@@ -31,11 +31,10 @@
 /**
  * WMGaugeView style protocol
  */
-@protocol WMGaugeViewStyle <NSObject>
+@protocol WMWatchGaugeViewStyle <NSObject>
 @required
-- (void)drawNeedleOnLayer:(CALayer*)layer inRect:(CGRect)rect 
-color:(UIColor *)color;
+- (void)drawNeedleInRect:(CGRect)rect color:(UIColor *)color atAngle:(CGFloat)angle inContext:(CGContextRef)context;
 - (void)drawFaceWithContext:(CGContextRef)context inRect:(CGRect)rect;
-- (BOOL)needleLayer:(CALayer*)layer willMoveAnimated:(BOOL)animated duration:(NSTimeInterval)duration animation:(CAKeyframeAnimation*)animation;
+//- (BOOL)needleLayer:(CALayer*)layer willMoveAnimated:(BOOL)animated duration:(NSTimeInterval)duration animation:(CAKeyframeAnimation*)animation;
 
 @end

@@ -14,7 +14,9 @@
 
 @implementation WMGaugeViewStyle3D
 
-- (void)drawNeedleOnLayer:(CALayer*)layer inRect:(CGRect)rect
+- (void)drawNeedleOnLayer:(CALayer*)layer 
+		   inRect:(CGRect)rect
+		    color:(UIColor *)color
 {
     // Left Needle
     CAShapeLayer *leftNeedleLayer = [CAShapeLayer layer];
