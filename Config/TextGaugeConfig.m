@@ -1,20 +1,35 @@
 //
-//  TextGauge.h
+//  TextGauge.m
 //  Wilhelm
 //
 //  Created by Scott Bender on 8/12/16.
 //  Copyright © 2016 Scott Bender. All rights reserved.
 //
 
-#import <UIKit/UIKit.h>
-#import "Boat.h"
-#import "GaugeConfig.h"
+#import "TextGaugeConfig.h"
 
-@interface TextGaugeConfig : GaugeConfig
+@implementation TextGaugeConfig
 
-@property (strong, atomic) NSString *valueFormat;
+- (NSNumber *)getValue:(Boat *)boat
+{
+  return nil;
+}
 
-- (NSNumber *)getValue:(Boat *)boat;
-- (NSString *)getStringValue:(Boat *)boat;
+- (NSString *)getStringValue:(Boat *)boat
+{
+  return nil;
+}
+
+- (NSString *)viewClassName
+{
+  return @"TextGaugeView";
+}
+
+
++ (NSString *)watchInterfaceController
+{
+  return @"TextGauge";
+}
+
 
 @end
